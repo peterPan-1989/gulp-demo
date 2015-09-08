@@ -1,0 +1,18 @@
+{
+  "name": "test-fis",
+  "version": "0.0.0",
+  "dependencies": {
+    "gulp-util": "~3.0.6",
+    "gulp": "~3.9.0",
+    "gulp-less" : "~3.0.3",
+    "del" : "~2.0.1",
+    "gulp-rename" : "1.2.2",
+    "velocity" : "0.7.2",
+    "extend" : "~3.0.0",
+    "streamqueue" : "~1.1.1",
+    "gulp-imagemin" : "~2.3.0",
+    "gulp-minify-css" : "~1.2.1",
+    "readable-stream" : "~2.0.2",
+    "gulp-spriter" : "~1.0.2"
+  }
+}

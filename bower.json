@@ -1,0 +1,12 @@
+{
+  "name": "hl",
+  "description": "App Description",
+  "version": "1.0.0",
+  "dependencies": {
+    "EaselJS" : "~0.8.1",
+    "TweenJS" : "~0.6.1",
+    "SoundJS" : "~0.6.1",
+    "PreloadJS" : "~0.6.1",
+    "requirejs" : "*"
+  }
+}
