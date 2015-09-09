@@ -23,6 +23,8 @@ var concat = require('gulp-concat');
 var through2 = require('through2');
 var preprocess = require('gulp-preprocess');
 var csso = require('gulp-csso');
+var requirejs   = require('requirejs');
+
 
 var srcRoot = "./src",
     templateRoot = './template',
@@ -52,19 +54,39 @@ var jsConcat = {
         paths.jsTemp  + "/common.js"]
 }
 
+var jsLib = ['jquery/jquery.js','requirejs/require.js'];
+
 /**
  * 压缩requirejs入口
  * @type {{index/index}}
  */
-var requireJsArr = [/*{
+/*var requireJsArr = [*//*{
     name: './common',
     include: [
         'jquery'
     ]
-},*/{
+},*//*{
     name: 'index/index',
     include: []
     //exclude: ["../"+paths.jsOutput + '/common']
+}];*/
+
+
+var requrejsModule = [{
+    name: './common',
+    include: [
+        'jquery'
+    ]
+},{
+    //module names are relative to baseUrl
+    name: 'index/aaa/ddd',
+    include: [],
+    exclude: ['./common']
+},{
+    //module names are relative to baseUrl/paths config
+    name: 'index/index',
+    include: [],
+    exclude: ['./common']
 }];
 
 
@@ -137,8 +159,13 @@ gulp.task('image', function () {
  */
 
 gulp.task('jsLib',function(){
+    var srcArr = [];
+    jsLib.forEach(function(val){
+        srcArr.push(paths.jsLibSrc + "/" +val);
+    });
+
     var jsLibOutput = env === "pro" ? paths.jsTemp+ "/lib" : paths.jsOutput + "/lib";
-    return gulp.src(paths.jsLibSrc)
+    return gulp.src(srcArr)
         .pipe(changed(jsLibOutput))
         .pipe(gulp.dest(jsLibOutput))
 });
@@ -169,8 +196,8 @@ gulp.task('js', function () {
  */
 
 gulp.task('requirejs-build',['js','jsLib'], function (cb) {
-    console.log(requireJsArr);
-    async.eachSeries(requireJsArr,function(item,icb){
+    //console.log(requireJsArr);
+    /*async.eachSeries(requireJsArr,function(item,icb){
         console.log(item);
         rjs({
             baseUrl: paths.jsTemp,
@@ -199,17 +226,49 @@ gulp.task('requirejs-build',['js','jsLib'], function (cb) {
             console.log(err);
         }
         cb(err);
-    })
+    })*/
+
+    async.waterfall([function(icb){
+        var fs = require('fs');
+        var config = {
+            appDir: paths.jsTemp,
+            mainConfigFile: paths.jsTemp + "/common.js",
+            dir: paths.jsOutput,
+            baseUrl : "./",
+            modules : requrejsModule};
+        fs.writeFile("rjsOption.js", JSON.stringify(config), icb);
+    },function(icb){
+
+        var spawn = require('child_process').spawn,
+            ls    = spawn('r.js', ['-o', "rjsOption.js"]);
+
+        ls.stdout.on('data', function (data) {
+            console.log('stdout: ' + data);
+        });
+
+        ls.stderr.on('data', function (data) {
+            console.log('stderr: ' + data);
+        });
+
+        ls.on('close', function (code) {
+            icb
+        });
+
+    }],function(err){
+
+        cb(err);
+
+    });
+
+    return;
 
 
-    /*return rjs({
 
-        appDir: paths.jsTemp,
-        mainConfigFile: paths.jsTemp + "./config.js",
-        dir: paths.jsOutput,
-        modules : requireModule
 
-    }).pipe(through2.obj(function (file, enc, next) {
+    /*return requirejs.optimize().on('defined',function(){
+        console.log(arguments)
+    });*/
+    /*.pipe(through2.obj(function (file, enc, next) {
         this.push(file);
         this.end();
         next();
@@ -355,7 +414,7 @@ gulp.task('pro',['clean'],function(){
  *5.md5 对路径加md5
  *6.requirejs ok
  *7.requirejs min ok
- *8.requirejs 公用抽离
+ *8.requirejs 公用抽离 ok
  *9.global 合并 ok
  *
  */

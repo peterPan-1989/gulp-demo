@@ -6,3 +6,7 @@ template
 js-temp
 dev-output
 pro-output
+rjsOption.js
+lib/
+build.js
+test.js

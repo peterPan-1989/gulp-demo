@@ -23,6 +23,7 @@
     "gulp-concat" : "~2.6.0",
     "through2" : "~2.0.0",
     "gulp-preprocess" : "~1.2.0",
-    "gulp-csso" : "~1.0.0"
+    "gulp-csso" : "~1.0.0",
+    "requirejs" : "*"
   }
 }
