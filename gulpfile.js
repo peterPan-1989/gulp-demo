@@ -11,16 +11,25 @@ var del = require('del');
 var less = require('gulp-less');
 var path = require('path');
 var rename = require('gulp-rename');
-var minifyCSS = require('gulp-minify-css');
-var streamqueue = require('streamqueue');
+//var minifyCSS = require('gulp-minify-css');
 var imagemin = require('gulp-imagemin');
-var Transform = require('readable-stream/transform');
-
+var rjs = require('gulp-requirejs');
+var async = require('async');
+var cache = require('gulp-cached');
+var es = require('event-stream');
+var changed = require('gulp-changed');
+var uglify = require('gulp-uglify');
+var concat = require('gulp-concat');
+var through2 = require('through2');
+var preprocess = require('gulp-preprocess');
+var csso = require('gulp-csso');
 
 var srcRoot = "./src",
-    outputRoot = './output',
     templateRoot = './template',
-    type = 'dev';
+    env = process.argv[2] === 'pro' ? "pro" : 'dev',
+    outputRoot = env === "pro" ? "./pro-output" :'./dev-output';
+
+
 
 var paths = {
     srcRoot : srcRoot,
@@ -30,14 +39,43 @@ var paths = {
     cssSrc : [srcRoot+"/css/*.less",srcRoot+"/+(modules)/*/css/*.less"],
     cssOutput : outputRoot + '/css',
     templateSrc : [srcRoot+"/html/**",srcRoot+"/+(modules)/*/html/**"],
-    templateOutput : templateRoot
+    templateOutput : templateRoot,
+    jsSrc : [srcRoot+"/js/**",srcRoot+"/+(modules)/*/js/**"],
+    jsOutput : outputRoot + '/js',
+    jsLibSrc : './lib/**',
+    jsTemp : "./js-temp"
+};
 
+
+var jsConcat = {
+    "global.js" : [paths.jsTemp  + "/lib/requirejs/require.js",
+        paths.jsTemp  + "/common.js"]
 }
+
+/**
+ * 压缩requirejs入口
+ * @type {{index/index}}
+ */
+var requireJsArr = [/*{
+    name: './common',
+    include: [
+        'jquery'
+    ]
+},*/{
+    name: 'index/index',
+    include: []
+    //exclude: ["../"+paths.jsOutput + '/common']
+}];
+
 
 
 gulp.task('clean', function() {
-    // You can use multiple globbing patterns as you would with `gulp.src`
-    return del([paths.outputRoot,paths.templateOutput]);
+    if(env === "dev"){
+        var arr = [paths.outputRoot,paths.templateOutput];
+    }else{
+        var arr = [paths.outputRoot,paths.templateOutput,paths.jsTemp];
+    }
+    return del(arr);
 });
 
 
@@ -52,11 +90,13 @@ function noop(cb){
 gulp.task('less', function () {
 
     var s = gulp.src(paths.cssSrc)
+        .pipe(cache('less'))
         .pipe(less({
             paths: [ path.join(__dirname, 'less', 'includes'),paths.srcRoot + '/css' ]
         }));
-    s = type === 'pro' ?  s.pipe(minifyCSS()) : s ;
-    s.pipe(rename(function(filepath) {
+    s = env === 'pro' ?  s.pipe(csso()) : s ;
+
+    return s.pipe(rename(function(filepath) {
         var res;
         if(res = /^modules\/([^\/]+)\/css/.exec(filepath.dirname)){
             filepath.dirname = res[1] + "/" + filepath.dirname.replace(res[0],'');
@@ -64,7 +104,7 @@ gulp.task('less', function () {
             filepath.dirname = "";
             filepath.basename = "";
         }
-        filepath.extname = type === "pro" ? ".min" + filepath.extname : filepath.extname;
+        //filepath.extname = env === "pro" ? ".min" + filepath.extname : filepath.extname;
     }))
     .pipe(gulp.dest(paths.cssOutput))
 });
@@ -74,7 +114,8 @@ gulp.task('less', function () {
  */
 
 gulp.task('image', function () {
-    gulp.src(paths.imgSrc)
+    return gulp.src(paths.imgSrc)
+
         .pipe(rename(function(filepath) {
             var res;
             if(res = /^modules\/([^\/]+)\/img/.exec(filepath.dirname)){
@@ -84,11 +125,147 @@ gulp.task('image', function () {
                 filepath.basename = "";
             }
         }))
+        .pipe(changed(paths.imgOutput))
         .pipe(imagemin({
             optimizationLevel : 5
         }))
         .pipe(gulp.dest(paths.imgOutput))
 });
+
+/**
+ * js lib
+ */
+
+gulp.task('jsLib',function(){
+    var jsLibOutput = env === "pro" ? paths.jsTemp+ "/lib" : paths.jsOutput + "/lib";
+    return gulp.src(paths.jsLibSrc)
+        .pipe(changed(jsLibOutput))
+        .pipe(gulp.dest(jsLibOutput))
+});
+
+/**
+ * js
+ */
+
+gulp.task('js', function () {
+    var jsLibOutput = env === "pro" ? paths.jsTemp : paths.jsOutput;
+
+    return  gulp.src(paths.jsSrc)
+        .pipe(cache('js'))
+        .pipe(rename(function(filepath) {
+            var res;
+            if(res = /^modules\/([^\/]+)\/js/.exec(filepath.dirname)){
+                filepath.dirname = res[1] + "/" + filepath.dirname.replace(res[0],'');
+            }else if(filepath.dirname.indexOf("modules") === 0){
+                filepath.dirname = "";
+                filepath.basename = "";
+            }
+        }))
+        .pipe(gulp.dest(jsLibOutput));
+});
+
+/**
+ * r.js压缩requirejs
+ */
+
+gulp.task('requirejs-build',['js','jsLib'], function (cb) {
+    console.log(requireJsArr);
+    async.eachSeries(requireJsArr,function(item,icb){
+        console.log(item);
+        rjs({
+            baseUrl: paths.jsTemp,
+            out: item['name'] + ".js",
+            mainConfigFile : paths.jsTemp + "/common.js",
+            name : item['name'],
+            exclude : item['exclude'],
+            include : item['include'],
+            shim: {
+                // standard require.js shim options
+            }
+        })
+            .pipe(through2.obj(function (file, enc, next) {
+                this.push(file);
+                this.end();
+                next();
+            }))
+            .pipe(uglify())
+            .pipe(gulp.dest(paths.jsOutput)).on('end',function(){
+                icb();
+            });
+
+
+    },function(err){
+        if(err){
+            console.log(err);
+        }
+        cb(err);
+    })
+
+
+    /*return rjs({
+
+        appDir: paths.jsTemp,
+        mainConfigFile: paths.jsTemp + "./config.js",
+        dir: paths.jsOutput,
+        modules : requireModule
+
+    }).pipe(through2.obj(function (file, enc, next) {
+        this.push(file);
+        this.end();
+        next();
+    }))
+        .pipe(uglify())
+        .pipe(gulp.dest(paths.jsOutput))*/
+
+   /* var ts = [];
+    for(var i= 0,length = requireJsArr.length;i<length;i++){
+        ts.push(
+            rjs({
+                baseUrl: paths.jsTemp,
+                out: requireJsArr[i]['name'] + ".js",
+                mainConfigFile : paths.jsTemp + "/common.js",
+                name : requireJsArr[i]['name'],
+                exclude : requireJsArr[i]['exclude'],
+                include : requireJsArr[i]['include'],
+                shim: {
+                    // standard require.js shim options
+                }
+            })
+                .pipe(through2.obj(function (file, enc, next) {
+                    this.push(file);
+                    this.end();
+                    next();
+                }))
+                .pipe(uglify())
+                .pipe(gulp.dest(paths.jsOutput))
+        );
+    }
+
+    return es.concat.apply(null, ts);*/
+
+});
+
+
+
+gulp.task('jsConcat',['js','jsLib'],function(){
+
+    var ts = [];
+    for(var key in jsConcat){
+        ts.push(gulp.src(jsConcat[key])
+            .pipe(concat(key))
+            .pipe(uglify())
+            .pipe(gulp.dest(paths.jsOutput)));
+    }
+    return es.concat.apply(null, ts);
+
+    /*return gulp.src([paths.jsOutput  + "/lib/requirejs/require.js",
+        paths.jsOutput  + "/config.js"])
+        .pipe(concat())
+        .pipe(gulp.dest(paths.jsOutput));*/
+
+})
+
+
 
 /**
  * template
@@ -102,7 +279,7 @@ gulp.task('template', function (cb) {
 
     var map = {};
 
-    var stream = gulp.src(paths.templateSrc)
+    return gulp.src(paths.templateSrc)
         .pipe(rename(function(filepath) {
             var oldPath;
             if(filepath.dirname.indexOf("modules") === 0 && filepath.extname === ".html"){
@@ -115,46 +292,41 @@ gulp.task('template', function (cb) {
             if(oldPath){
                 map[oldPath] = filepath.dirname + "/" + filepath.basename + filepath.extname;
             }
-
         }))
-        .pipe(gulp.dest(paths.templateOutput));
-
-    stream.on('end',function(){
-        var Engine = require('velocity').Engine;
-
-        //渲染模版
-        for(var oldPath in map){
-            var newPath = map[oldPath],
-                data;
-            try{
-                var regex = /^modules\/([^\/]+)\/html\/(.+?)\.html$/,
-                    pathRes;
-                if(pathRes = regex.exec(oldPath)){
-                    data = require(paths.srcRoot + "/modules/"+pathRes[1]+"/data/"+pathRes[2]+".js");
-                }else{
-                    data = {};
-                }
-
-            }catch (e){
-                if(e.code === 'MODULE_NOT_FOUND'){
-                    data = {};
-                }
-            }
+        .pipe(preprocess({context: { NODE_ENV: env, DEBUG: true}})) //To set environment variables in-line
+        .pipe(gulp.dest(paths.templateOutput))
+        .pipe(es.wait(function (err, body) {
+            var Engine = require('velocity').Engine;
             //渲染模版
-            var engine = new Engine({
-                root: paths.templateOutput,
-                template: paths.templateOutput + "/" +newPath,
-                output: paths.outputRoot + "/" + newPath
-            });
-            var result = engine.render(data);
-        }
+            for(var oldPath in map){
+                var newPath = map[oldPath],
+                    data;
+                try{
+                    var regex = /^modules\/([^\/]+)\/html\/(.+?)\.html$/,
+                        pathRes;
+                    if(pathRes = regex.exec(oldPath)){
+                        data = require(paths.srcRoot + "/modules/"+pathRes[1]+"/data/"+pathRes[2]+".js");
+                    }else{
+                        data = {};
+                    }
 
-
-
-        cb();
-    });
-
+                }catch (e){
+                    if(e.code === 'MODULE_NOT_FOUND'){
+                        data = {};
+                    }
+                }
+                //渲染模版
+                var engine = new Engine({
+                    root: paths.templateOutput,
+                    template: paths.templateOutput + "/" +newPath,
+                    output: paths.outputRoot + "/" + newPath
+                });
+                var result = engine.render(data);
+            }
+        }));
 });
+
+
 
 
 
@@ -166,12 +338,11 @@ gulp.task('watch', function() {
 
 
 gulp.task('default',['clean'],function(){
-    gulp.start(['less','image','template']);
+    gulp.start(['less','image','template','jsLib','js']);
 });
 
-gulp.task('pro',function(){
-    type = 'pro';
-    gulp.start(['default']);
+gulp.task('pro',['clean'],function(){
+    gulp.start(['less','image','template','requirejs-build','jsConcat']);
 
 });
 
@@ -182,6 +353,9 @@ gulp.task('pro',function(){
  *3.css sprite
  *4.inline 把css，js inline进去html里面
  *5.md5 对路径加md5
- *6.requirejs
+ *6.requirejs ok
+ *7.requirejs min ok
+ *8.requirejs 公用抽离
+ *9.global 合并 ok
  *
  */

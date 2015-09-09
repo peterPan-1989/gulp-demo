@@ -1,12 +1,10 @@
 {
-  "name": "hl",
+  "name": "demo",
   "description": "App Description",
-  "version": "1.0.0",
+  "version": "0.0.0",
+  "componentsDirectory": "lib/",
   "dependencies": {
-    "EaselJS" : "~0.8.1",
-    "TweenJS" : "~0.6.1",
-    "SoundJS" : "~0.6.1",
-    "PreloadJS" : "~0.6.1",
+    "jquery" : "~1.9.0",
     "requirejs" : "*"
   }
 }

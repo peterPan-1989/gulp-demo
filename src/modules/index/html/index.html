@@ -1,12 +1,16 @@
 
 
 #parse( "header.html" )
+    <link type="text/css" href="${rootPath}/css/index/index.css"  rel="stylesheet" type="text/css"/>
+#parse( "footer.html" )
+
+<!-- @if NODE_ENV='pro' -->
+<script type="text/javascript" src="${rootPath}/js/index/index.js"></script>
+<!-- @endif -->
+<script>
+    require(['index/index']);
+</script>
 
 
-
-<body>
-
-</body>
-</html>
 
 

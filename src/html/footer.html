@@ -1,0 +1,14 @@
+
+
+
+</body>
+</html>
+
+<!-- @if NODE_ENV='pro' -->
+<script type="text/javascript" src="${rootPath}/js/global.js" ></script>
+<!-- @endif -->
+
+<!-- @if NODE_ENV='dev' -->
+<script type="text/javascript" data-main="./js/common.js"
+        src="${rootPath}/js/lib/requirejs/require.js" ></script>
+<!-- @endif -->

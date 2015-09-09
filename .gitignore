@@ -3,3 +3,6 @@ output
 node_modules
 private
 template
+js-temp
+dev-output
+pro-output
