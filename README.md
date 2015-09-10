@@ -2,6 +2,9 @@
 ### 安装相关的依赖</br>
 	1. sudo npm install
 	2. bower install
+	3. npm install -g gulp
+	如果出现npm过慢问题，推荐参考文章 <http://www.cnblogs.com/trying/p/4064518.html>
+	bower过慢问题，推荐参考文章 <http://segmentfault.com/a/1190000002435496>
 
 ### 生成开发环境代码</br>
 	gulp
@@ -49,7 +52,7 @@
 
 
 
-### 完成进度
+## 完成进度
 * volecity模版解释 ok</br>
 * img压缩 ok</br>
 * less解释和css压缩 ok</br>

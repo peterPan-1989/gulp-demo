@@ -205,7 +205,7 @@ gulp.task('pro-js-build',['js','jsLib'], function (cb) {
             dir: paths.jsOutput,
             baseUrl : "./",
             modules : requrejsModule};
-        fs.writeFile(paths.outputRoot + "/rjsOption.js", JSON.stringify(config), icb);
+        fs.writeFile(paths.outputDir + "/rjsOption.js", JSON.stringify(config), icb);
     },function(icb){
 
         var spawn = require('child_process').spawn,
