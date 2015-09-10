@@ -1,18 +1,18 @@
-##使用方法
-###安装相关的依赖
+## 使用方法
+### 安装相关的依赖</br>
 	1. sudo npm install
 	2. bower install
 
-###生成开发环境代码
+### 生成开发环境代码</br>
 	gulp
 
-###生成生产环境代码
+### 生成生产环境代码</br>
 	gulp pro
 
 
-##注意事项
+## 注意事项
 
-###目录结构与文件命名
+### 目录结构与文件命名
 
 1. src/modules/*/{css|html}/*，也就是模块中的每个css和html目录下的文件不存在目录层级，即全部放在同一层级，如index模块(modules/index/css/*.less)，里面的less文件全部放到modules/index/css目录下，不能在新建目录如modules/index/css/xxx。如果要存在多层级关系，可以通过命名限定，如index.less，index.header.less，index.main.less，在最终的输出时css文件全部输出到output/css/*.css，输出目录不存在二级目录，全部同层级关系。
 
@@ -21,7 +21,7 @@
 
 3. img，js目录可分层级。如modules/index/img/xxx/a.png，到最终输出位置为output/img/xxx/a.png。
 
-###模版与数据绑定
+### 模版与数据绑定
 
 1. html模版编写完以后，在对应的层级的目录下找到data目录并且对应html的名字编写模版的对应数据结构。数据文件用nodejs解释，可以放json格式或者js函数，
 并且可以引用其他的数据文件进行继承
@@ -49,7 +49,7 @@
 
 
 
-###完成进度
+### 完成进度
 * volecity模版解释 ok</br>
 * img压缩 ok</br>
 * less解释和css压缩 ok</br>
