@@ -50,6 +50,8 @@
 4. exclude是为了提取common的js文件的需求存在的，在exclude里面配置相关的js文件，那么每个模块压缩的时候就会从exclude里面解释是否已经存在，存在的模块
 就不进行引入。
 
+### jsLib的配置
+1. js的lib包我们用bower管理，通过配置，我们的jsLib全部都放在代码目录下的lib目录中，但是在生成最终文件的过程中我们不会全部复制到output目录中，仅通过配置转移需要的js或某个目录。配置文件在src/jsLibConfig.js中。
 
 
 ## 完成进度

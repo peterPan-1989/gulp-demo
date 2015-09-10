@@ -38,11 +38,13 @@ var paths = {
     cssSrc : [srcRoot+"/css/*.less",srcRoot+"/+(modules)/*/css/*.less"],
     cssOutput : outputDir + '/css',
     templateSrc : [srcRoot+"/html/**",srcRoot+"/+(modules)/*/html/**"],
+    dataSrc : [srcRoot+"/data/**",srcRoot+"/+(modules)/*/data/**"],
     templateOutput : templateDir,
     jsSrc : [srcRoot+"/js/**",srcRoot+"/+(modules)/*/js/**"],
     jsOutput : outputDir + '/js',
-    jsLibSrc : './lib/**',
-    jsTemp : "./output/js-temp"
+    jsLibSrc : './lib',
+    jsTemp : outputRoot + "/js-temp",
+    jsLibConfigSrc : srcRoot + '/jsLibConfig.js'
 };
 
 //js压缩后，r.js处理后对最终文件进行压缩
@@ -51,8 +53,7 @@ var jsConcat = {
         paths.jsOutput  + "/common.js"]
 }
 
-//js lib 的文件路径，或整个文件夹路径
-var jsLib = ['jquery/jquery.js','requirejs/require.js'];
+
 
 
 gulp.task('clean', function() {
@@ -135,11 +136,20 @@ gulp.task('image', function () {
 
 gulp.task('jsLib',function(){
     var srcArr = [];
+    //js lib 的文件路径，或整个文件夹路径
+    var jsLib = require('./' + paths.jsLibConfigSrc);
+    delete require.cache[require.resolve('./' + paths.jsLibConfigSrc)];
+
     jsLib.forEach(function(val){
         srcArr.push(paths.jsLibSrc + "/" +val);
     });
 
+    //console.log("srcArr:" + JSON.stringify(srcArr));
+
+
     var jsLibOutput = env === "pro" ? paths.jsTemp+ "/lib" : paths.jsOutput + "/lib";
+    //console.log("jsLibOutput:" + jsLibOutput);
+
     return gulp.src(srcArr)
         .pipe(changed(jsLibOutput))
         .pipe(gulp.dest(jsLibOutput))
@@ -321,17 +331,23 @@ gulp.task('template', function (cb) {
 
 gulp.task('watch', function() {
     //problem：路径不能存在./这样的当前目录形式，只能形如src/xxx/xx，而不能./src/xxx/xx
+    //console.log(paths.imgSrc);
     gulp.watch(paths.imgSrc,['image']);
     gulp.watch(paths.cssSrc,['less']);
-    gulp.watch(paths.templateSrc,['template']);
-    gulp.watch(paths.jsLibSrc,['jsLib']);
+    gulp.watch([].concat(paths.templateSrc,paths.dataSrc),['template']);
+    //console.log('template watch : ' + JSON.stringify([].concat(paths.templateSrc,paths.dataSrc)) );
+
+    //console.log('jsLib watch : ' + JSON.stringify([].concat([paths.jsLibSrc,paths.jsLibConfigSrc]) ));
+    gulp.watch([].concat([paths.jsLibSrc,paths.jsLibConfigSrc]),['jsLib']);
     gulp.watch(paths.jsSrc,['js']);
 });
 
 
-
 gulp.task('default',['clean'],function(){
-    gulp.start(['less','image','template','jsLib','js','watch']);
+    gulp.start(['less','image','template','jsLib','js','watch'])
+   .on('stop',function(){
+
+    });
 });
 
 
