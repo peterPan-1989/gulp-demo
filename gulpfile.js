@@ -3,99 +3,63 @@
  */
 
 
-
-
-
 var gulp = require('gulp');
 var del = require('del');
 var less = require('gulp-less');
 var path = require('path');
 var rename = require('gulp-rename');
-//var minifyCSS = require('gulp-minify-css');
 var imagemin = require('gulp-imagemin');
-var rjs = require('gulp-requirejs');
 var async = require('async');
 var cache = require('gulp-cached');
 var es = require('event-stream');
 var changed = require('gulp-changed');
 var uglify = require('gulp-uglify');
 var concat = require('gulp-concat');
-var through2 = require('through2');
 var preprocess = require('gulp-preprocess');
 var csso = require('gulp-csso');
 var requirejs   = require('requirejs');
+var fs = require('fs');
 
-
-var srcRoot = "./src",
-    templateRoot = './template',
+//ps:路径不要加./ ，watch不支持
+var srcRoot = "src",
+    outputRoot = "./output",
+    templateDir = outputRoot + '/template',
     env = process.argv[2] === 'pro' ? "pro" : 'dev',
-    outputRoot = env === "pro" ? "./pro-output" :'./dev-output';
+    outputDir = env === "pro" ? outputRoot + "/pro-output" :outputRoot + '/dev-output';
 
 
 
 var paths = {
     srcRoot : srcRoot,
     outputRoot : outputRoot,
+    outputDir : outputDir,
     imgSrc : [srcRoot+"/img/**",srcRoot+"/+(modules)/*/img/**"],
-    imgOutput : outputRoot + '/img',
+    imgOutput : outputDir + '/img',
     cssSrc : [srcRoot+"/css/*.less",srcRoot+"/+(modules)/*/css/*.less"],
-    cssOutput : outputRoot + '/css',
+    cssOutput : outputDir + '/css',
     templateSrc : [srcRoot+"/html/**",srcRoot+"/+(modules)/*/html/**"],
-    templateOutput : templateRoot,
+    templateOutput : templateDir,
     jsSrc : [srcRoot+"/js/**",srcRoot+"/+(modules)/*/js/**"],
-    jsOutput : outputRoot + '/js',
+    jsOutput : outputDir + '/js',
     jsLibSrc : './lib/**',
-    jsTemp : "./js-temp"
+    jsTemp : "./output/js-temp"
 };
 
-
+//js压缩后，r.js处理后对最终文件进行压缩
 var jsConcat = {
     "global.js" : [paths.jsTemp  + "/lib/requirejs/require.js",
-        paths.jsTemp  + "/common.js"]
+        paths.jsOutput  + "/common.js"]
 }
 
+//js lib 的文件路径，或整个文件夹路径
 var jsLib = ['jquery/jquery.js','requirejs/require.js'];
-
-/**
- * 压缩requirejs入口
- * @type {{index/index}}
- */
-/*var requireJsArr = [*//*{
-    name: './common',
-    include: [
-        'jquery'
-    ]
-},*//*{
-    name: 'index/index',
-    include: []
-    //exclude: ["../"+paths.jsOutput + '/common']
-}];*/
-
-
-var requrejsModule = [{
-    name: './common',
-    include: [
-        'jquery'
-    ]
-},{
-    //module names are relative to baseUrl
-    name: 'index/aaa/ddd',
-    include: [],
-    exclude: ['./common']
-},{
-    //module names are relative to baseUrl/paths config
-    name: 'index/index',
-    include: [],
-    exclude: ['./common']
-}];
-
 
 
 gulp.task('clean', function() {
     if(env === "dev"){
-        var arr = [paths.outputRoot,paths.templateOutput];
+        var arr = [paths.outputDir,paths.templateOutput];
     }else{
-        var arr = [paths.outputRoot,paths.templateOutput,paths.jsTemp];
+        var arr = [paths.outputDir,paths.templateOutput,paths.jsTemp];
     }
     return del(arr);
 });
@@ -107,6 +71,7 @@ function noop(cb){
 
 /**
  * less
+ * 编译less文件并且移动到指定css目录
  */
 
 gulp.task('less', function () {
@@ -121,7 +86,8 @@ gulp.task('less', function () {
     return s.pipe(rename(function(filepath) {
         var res;
         if(res = /^modules\/([^\/]+)\/css/.exec(filepath.dirname)){
-            filepath.dirname = res[1] + "/" + filepath.dirname.replace(res[0],'');
+            //filepath.dirname = res[1] + "/" + filepath.dirname.replace(res[0],'');
+            filepath.dirname = ".";
         }else if(filepath.dirname.indexOf("modules") === 0){
             filepath.dirname = "";
             filepath.basename = "";
@@ -132,12 +98,16 @@ gulp.task('less', function () {
 });
 
 /**
- * image
+ * 图片移动，将global和各个模块的图片移动到最终输出目录，
+ * 如果时pro模式，将会压缩图片。
+ * 最终输出的图片目录如
+ * img/xxx.png，全局图片
+ * img/{modules}/xxx.png  各个模块的第一层级的图片
+ * img/{modules}/{subModules}/xxx.png  各个模块的第二层级的图片
  */
 
 gulp.task('image', function () {
-    return gulp.src(paths.imgSrc)
-
+    var s = gulp.src(paths.imgSrc)
         .pipe(rename(function(filepath) {
             var res;
             if(res = /^modules\/([^\/]+)\/img/.exec(filepath.dirname)){
@@ -147,15 +117,20 @@ gulp.task('image', function () {
                 filepath.basename = "";
             }
         }))
-        .pipe(changed(paths.imgOutput))
-        .pipe(imagemin({
-            optimizationLevel : 5
-        }))
-        .pipe(gulp.dest(paths.imgOutput))
+        .pipe(changed(paths.imgOutput));
+
+    s = env === 'pro' ?  s.pipe(imagemin({
+        optimizationLevel : 5
+    })) : s ;
+
+    return  s.pipe(gulp.dest(paths.imgOutput))
 });
 
 /**
  * js lib
+ * 移动lib里面对应的需要移动的js文件或文件夹，可从jsLib配置
+ * 移动的最终位置，dev模式为直接dev－output/js/lib的目录
+ * pro模式为output/js－temp的目录，便于r.js处理与js文件合并
  */
 
 gulp.task('jsLib',function(){
@@ -172,6 +147,9 @@ gulp.task('jsLib',function(){
 
 /**
  * js
+ * 移动js目录以及各个模块的js文件
+ * 移动的最终位置，dev模式为直接dev－output/js的目录
+ * pro模式为output/js－temp的目录，便于r.js处理与js文件合并
  */
 
 gulp.task('js', function () {
@@ -192,143 +170,89 @@ gulp.task('js', function () {
 });
 
 /**
- * r.js压缩requirejs
+ * 1.r.js压缩requirejs,并且生成公用文件，并且去除重复
+ * 2.合并某些最终文件，一般是global.js和common.js的合并
+ *
  */
 
-gulp.task('requirejs-build',['js','jsLib'], function (cb) {
-    //console.log(requireJsArr);
-    /*async.eachSeries(requireJsArr,function(item,icb){
-        console.log(item);
-        rjs({
-            baseUrl: paths.jsTemp,
-            out: item['name'] + ".js",
-            mainConfigFile : paths.jsTemp + "/common.js",
-            name : item['name'],
-            exclude : item['exclude'],
-            include : item['include'],
-            shim: {
-                // standard require.js shim options
-            }
-        })
-            .pipe(through2.obj(function (file, enc, next) {
-                this.push(file);
-                this.end();
-                next();
-            }))
-            .pipe(uglify())
-            .pipe(gulp.dest(paths.jsOutput)).on('end',function(){
-                icb();
-            });
-
-
-    },function(err){
-        if(err){
-            console.log(err);
-        }
-        cb(err);
-    })*/
-
+gulp.task('pro-js-build',['js','jsLib'], function (cb) {
     async.waterfall([function(icb){
-        var fs = require('fs');
+        fs.readdir('./' + paths.srcRoot+"/modules", function(err,arr){
+            if(err){
+                return icb(err);
+            }
+            var res = ['./' + paths.srcRoot + '/jsConfig.js'];
+            arr.forEach(function(val){
+                res.push('./' + paths.srcRoot + '/modules/' + val + '/jsConfig.js');
+            });
+            var modules = [];
+            res.forEach(function(val){
+                var moduleItem;
+                try{
+                    moduleItem = require(val);
+                    modules.push(moduleItem);
+                }catch (e){
+                    console.error(e);
+                }
+            })
+            icb(null,modules);
+        })
+
+    },function(requrejsModule,icb){
         var config = {
             appDir: paths.jsTemp,
             mainConfigFile: paths.jsTemp + "/common.js",
             dir: paths.jsOutput,
             baseUrl : "./",
             modules : requrejsModule};
-        fs.writeFile("rjsOption.js", JSON.stringify(config), icb);
+        fs.writeFile(paths.outputRoot + "/rjsOption.js", JSON.stringify(config), icb);
     },function(icb){
 
         var spawn = require('child_process').spawn,
             ls    = spawn('r.js', ['-o', "rjsOption.js"]);
-
         ls.stdout.on('data', function (data) {
-            console.log('stdout: ' + data);
+            console.log('r.js:' + data);
         });
-
         ls.stderr.on('data', function (data) {
-            console.log('stderr: ' + data);
+            console.error('r.js: ' + data);
         });
-
         ls.on('close', function (code) {
-            icb
+            icb();
         });
 
+    },function(icb){
+        //concat the file js
+        var ts = [];
+        for(var key in jsConcat){
+            ts.push(gulp.src(jsConcat[key])
+                .pipe(concat(key))
+                .pipe(uglify())
+                .pipe(gulp.dest(paths.jsOutput)));
+        }
+        return es.concat.apply(null, ts).on('end',function(){
+            //console.log('concat end');
+            icb();
+        });
     }],function(err){
-
+        err && console.error(err);
         cb(err);
-
     });
 
     return;
 
 
-
-
-    /*return requirejs.optimize().on('defined',function(){
-        console.log(arguments)
-    });*/
-    /*.pipe(through2.obj(function (file, enc, next) {
-        this.push(file);
-        this.end();
-        next();
-    }))
-        .pipe(uglify())
-        .pipe(gulp.dest(paths.jsOutput))*/
-
-   /* var ts = [];
-    for(var i= 0,length = requireJsArr.length;i<length;i++){
-        ts.push(
-            rjs({
-                baseUrl: paths.jsTemp,
-                out: requireJsArr[i]['name'] + ".js",
-                mainConfigFile : paths.jsTemp + "/common.js",
-                name : requireJsArr[i]['name'],
-                exclude : requireJsArr[i]['exclude'],
-                include : requireJsArr[i]['include'],
-                shim: {
-                    // standard require.js shim options
-                }
-            })
-                .pipe(through2.obj(function (file, enc, next) {
-                    this.push(file);
-                    this.end();
-                    next();
-                }))
-                .pipe(uglify())
-                .pipe(gulp.dest(paths.jsOutput))
-        );
-    }
-
-    return es.concat.apply(null, ts);*/
-
 });
 
 
 
-gulp.task('jsConcat',['js','jsLib'],function(){
 
-    var ts = [];
-    for(var key in jsConcat){
-        ts.push(gulp.src(jsConcat[key])
-            .pipe(concat(key))
-            .pipe(uglify())
-            .pipe(gulp.dest(paths.jsOutput)));
-    }
-    return es.concat.apply(null, ts);
-
-    /*return gulp.src([paths.jsOutput  + "/lib/requirejs/require.js",
-        paths.jsOutput  + "/config.js"])
-        .pipe(concat())
-        .pipe(gulp.dest(paths.jsOutput));*/
-
-})
 
 
 
 /**
- * template
+ * template渲染
  * 引入volecity模版
+ * 最终将模版输出到template目录和测试目录
  *
  *
  */
@@ -339,6 +263,7 @@ gulp.task('template', function (cb) {
     var map = {};
 
     return gulp.src(paths.templateSrc)
+        .pipe(cache('template'))
         .pipe(rename(function(filepath) {
             var oldPath;
             if(filepath.dirname.indexOf("modules") === 0 && filepath.extname === ".html"){
@@ -364,23 +289,27 @@ gulp.task('template', function (cb) {
                     var regex = /^modules\/([^\/]+)\/html\/(.+?)\.html$/,
                         pathRes;
                     if(pathRes = regex.exec(oldPath)){
-                        data = require(paths.srcRoot + "/modules/"+pathRes[1]+"/data/"+pathRes[2]+".js");
+                        var dataPath = './'+paths.srcRoot + "/modules/"+pathRes[1]+"/data/"+pathRes[2]+".js";
+                        data = require(dataPath);
                     }else{
                         data = {};
                     }
 
                 }catch (e){
+                    console.error(e);
                     if(e.code === 'MODULE_NOT_FOUND'){
                         data = {};
                     }
                 }
+
                 //渲染模版
                 var engine = new Engine({
                     root: paths.templateOutput,
                     template: paths.templateOutput + "/" +newPath,
-                    output: paths.outputRoot + "/" + newPath
+                    output: paths.outputDir + "/" + newPath
                 });
                 var result = engine.render(data);
+
             }
         }));
 });
@@ -389,32 +318,23 @@ gulp.task('template', function (cb) {
 
 
 
+
 gulp.task('watch', function() {
-    gulp.watch(paths.scripts, ['scripts']);
-    gulp.watch(paths.images, ['images']);
+    //problem：路径不能存在./这样的当前目录形式，只能形如src/xxx/xx，而不能./src/xxx/xx
+    gulp.watch(paths.imgSrc,['image']);
+    gulp.watch(paths.cssSrc,['less']);
+    gulp.watch(paths.templateSrc,['template']);
+    gulp.watch(paths.jsLibSrc,['jsLib']);
+    gulp.watch(paths.jsSrc,['js']);
 });
 
 
 
 gulp.task('default',['clean'],function(){
-    gulp.start(['less','image','template','jsLib','js']);
+    gulp.start(['less','image','template','jsLib','js','watch']);
 });
+
 
 gulp.task('pro',['clean'],function(){
-    gulp.start(['less','image','template','requirejs-build','jsConcat']);
-
+    gulp.start(['less','image','template','pro-js-build']);
 });
-
-
-/**
- *1.img压缩 ok
- *2.css压缩 ok
- *3.css sprite
- *4.inline 把css，js inline进去html里面
- *5.md5 对路径加md5
- *6.requirejs ok
- *7.requirejs min ok
- *8.requirejs 公用抽离 ok
- *9.global 合并 ok
- *
- */

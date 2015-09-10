@@ -3,5 +3,5 @@
  */
 
 define(["jquery"], function($) {
-    alert("aaa.ddd");
+    alert("aaa.ddd.22");
 })

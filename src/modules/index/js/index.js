@@ -3,7 +3,7 @@
  */
 
 define(["jquery","./aaa/ddd"], function($,ddd) {
-    alert("index");
+    alert("index134");
 })
 
 
