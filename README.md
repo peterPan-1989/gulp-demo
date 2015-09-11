@@ -3,6 +3,7 @@
 	1. sudo npm install
 	2. bower install
 	3. npm install -g gulp
+	4. npm install -g requirejs
 	如果出现npm过慢问题，推荐参考文章 <http://www.cnblogs.com/trying/p/4064518.html>
 	bower过慢问题，推荐参考文章 <http://segmentfault.com/a/1190000002435496>
 

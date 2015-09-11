@@ -19,6 +19,11 @@ var preprocess = require('gulp-preprocess');
 var csso = require('gulp-csso');
 var requirejs   = require('requirejs');
 var fs = require('fs');
+var slash = require('slash');
+
+
+
+
 
 //ps:路径不要加./ ，watch不支持
 var srcRoot = "src",
@@ -86,7 +91,7 @@ gulp.task('less', function () {
 
     return s.pipe(rename(function(filepath) {
         var res;
-        if(res = /^modules\/([^\/]+)\/css/.exec(filepath.dirname)){
+        if(res = /^modules\/([^\/]+)\/css/.exec(slash(filepath.dirname) )){
             //filepath.dirname = res[1] + "/" + filepath.dirname.replace(res[0],'');
             filepath.dirname = ".";
         }else if(filepath.dirname.indexOf("modules") === 0){
@@ -95,7 +100,7 @@ gulp.task('less', function () {
         }
         //filepath.extname = env === "pro" ? ".min" + filepath.extname : filepath.extname;
     }))
-    .pipe(gulp.dest(paths.cssOutput))
+        .pipe(gulp.dest(paths.cssOutput))
 });
 
 /**
@@ -111,18 +116,18 @@ gulp.task('image', function () {
     var s = gulp.src(paths.imgSrc)
         .pipe(rename(function(filepath) {
             var res;
-            if(res = /^modules\/([^\/]+)\/img/.exec(filepath.dirname)){
-                filepath.dirname = res[1] + "/" + filepath.dirname.replace(res[0],'');
+            if(res = /^modules\/([^\/]+)\/img/.exec(slash(filepath.dirname))){
+                filepath.dirname = res[1] + "/" + slash(filepath.dirname).replace(res[0],'');
             }else if(filepath.dirname.indexOf("modules") === 0){
                 filepath.dirname = "";
                 filepath.basename = "";
             }
-        }))
-        .pipe(changed(paths.imgOutput));
+        }));
+    s = env ==='pro' ? s : s.pipe(changed(paths.imgOutput));
 
-    s = env === 'pro' ?  s.pipe(imagemin({
-        optimizationLevel : 5
-    })) : s ;
+    /*s = env === 'pro' ?  s.pipe(imagemin({
+     optimizationLevel : 5
+     })) : s ;*/
 
     return  s.pipe(gulp.dest(paths.imgOutput))
 });
@@ -169,8 +174,10 @@ gulp.task('js', function () {
         .pipe(cache('js'))
         .pipe(rename(function(filepath) {
             var res;
-            if(res = /^modules\/([^\/]+)\/js/.exec(filepath.dirname)){
-                filepath.dirname = res[1] + "/" + filepath.dirname.replace(res[0],'');
+            if(res = /^modules\/([^\/]+)\/js/.exec(slash(filepath.dirname))){
+                //console.log(res);
+                filepath.dirname = path.normalize(res[1] + "/" + slash(filepath.dirname).replace(res[0],''));
+                //console.log(filepath.dirname);
             }else if(filepath.dirname.indexOf("modules") === 0){
                 filepath.dirname = "";
                 filepath.basename = "";
@@ -200,7 +207,7 @@ gulp.task('pro-js-build',['js','jsLib'], function (cb) {
                 var moduleItem;
                 try{
                     moduleItem = require(val);
-                    modules.push(moduleItem);
+                    modules = modules.concat(moduleItem);
                 }catch (e){
                     console.error(e);
                 }
@@ -215,22 +222,24 @@ gulp.task('pro-js-build',['js','jsLib'], function (cb) {
             dir: paths.jsOutput,
             baseUrl : "./",
             modules : requrejsModule};
-        fs.writeFile(paths.outputDir + "/rjsOption.js", JSON.stringify(config), icb);
+        fs.writeFile(/*paths.outputDir +*//*paths.srcRoot*/   "./rjsOption.js", JSON.stringify(config), icb);
     },function(icb){
-
+        //console.log(require('os').platform() === 'win32' ? 'r.js.cmd' : 'r.js');
         var spawn = require('child_process').spawn,
-            ls    = spawn('r.js', ['-o', "rjsOption.js"]);
-        ls.stdout.on('data', function (data) {
+            sp    = spawn(require('os').platform() === 'win32' ? 'r.js.cmd' : 'r.js', ['-o', "./rjsOption.js"]);
+        sp.stdout.on('data', function (data) {
             console.log('r.js:' + data);
         });
-        ls.stderr.on('data', function (data) {
+        sp.stderr.on('data', function (data) {
             console.error('r.js: ' + data);
         });
-        ls.on('close', function (code) {
+        sp.on('close', function (code) {
+            console.log('000');
             icb();
         });
 
     },function(icb){
+        //console.log(123);
         //concat the file js
         var ts = [];
         for(var key in jsConcat){
@@ -298,7 +307,7 @@ gulp.task('template', function (cb) {
                 try{
                     var regex = /^modules\/([^\/]+)\/html\/(.+?)\.html$/,
                         pathRes;
-                    if(pathRes = regex.exec(oldPath)){
+                    if(pathRes = regex.exec(slash(oldPath))){
                         var dataPath = './'+paths.srcRoot + "/modules/"+pathRes[1]+"/data/"+pathRes[2]+".js";
                         data = require(dataPath);
                     }else{
@@ -345,12 +354,15 @@ gulp.task('watch', function() {
 
 gulp.task('default',['clean'],function(){
     gulp.start(['less','image','template','jsLib','js','watch'])
-   .on('stop',function(){
+        .on('stop',function(){
 
-    });
+        });
 });
 
 
-gulp.task('pro',['clean'],function(){
-    gulp.start(['less','image','template','pro-js-build']);
+gulp.task('pro',[],function(){
+
+    gulp.start(['less','template','image','pro-js-build']);
 });
+
+
