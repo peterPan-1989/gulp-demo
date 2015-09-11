@@ -25,6 +25,8 @@ var slash = require('slash');
 
 
 
+
+
 //ps:路径不要加./ ，watch不支持
 var srcRoot = "src",
     outputRoot = "./output",
